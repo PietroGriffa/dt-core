@@ -10,6 +10,7 @@ import numpy as np
 class lane_controller(object):
 
     def __init__(self):
+
         self.node_name = rospy.get_name()
         self.lane_reading = None
         self.last_ms = None
@@ -26,10 +27,12 @@ class lane_controller(object):
 
         # Publication
         self.pub_car_cmd = rospy.Publisher("~car_cmd", Twist2DStamped, queue_size=1)
-        
+        self.pub_ac_rif = rospy.Publisher("~ac_rif", Twist2DStamped, queue_size=1)
+
+
         # TODO-TAL this is just to acknowledge receiving a msg... We should remove it... (or replace this and the corresponding subscriber with a service)
         self.pub_actuator_limits_received = rospy.Publisher("~actuator_limits_received", BoolStamped, queue_size=1)
-        
+
         self.pub_radius_limit = rospy.Publisher("~radius_limit", BoolStamped, queue_size=1)
 
 
@@ -76,7 +79,6 @@ class lane_controller(object):
         # timer
 
         #TODO-TAL this time updates the params at 10Hz. Really useful ?
-
         self.gains_timer = rospy.Timer(rospy.Duration.from_sec(0.1), self.getGains_event)
         rospy.loginfo("[%s] Initialized " % (rospy.get_name()))
 
@@ -262,6 +264,7 @@ class lane_controller(object):
 
 
     def PoseHandling(self, input_pose_msg, pose_source):
+
         if not self.active:
             return
 
@@ -290,6 +293,7 @@ class lane_controller(object):
                 self.v_ref_possible["main_pose"] = self.v_bar
                 self.main_pose_source = pose_source
                 self.pose_initialized = True
+
         elif self.fsm_state == "PARKING":
             if pose_source == "parking":
                 #rospy.loginfo("pose source: parking!?")
@@ -453,8 +457,6 @@ class lane_controller(object):
         omega += (omega_feedforward)
 
 
-
-
         # check if nominal omega satisfies min radius, otherwise constrain it to minimal radius
         if math.fabs(omega) > car_control_msg.v / self.min_radius:
             if self.last_ms is not None:
@@ -475,8 +477,6 @@ class lane_controller(object):
                 car_control_msg.v = 0.065 + 0.5 * math.fabs(omega) * 0.1
 
 
-
-
         # apply magic conversion factors
         car_control_msg.v = car_control_msg.v * self.velocity_to_m_per_s
         omega = omega * self.omega_to_rad_per_s
@@ -485,9 +485,22 @@ class lane_controller(object):
         if omega < self.omega_min: omega = self.omega_min
         omega += self.omega_ff
         car_control_msg.omega = omega
-        self.publishCmd(car_control_msg)
-        self.last_ms = currentMillis
 
+        '''
+        Use the flag ac_on to identify when the Adaptive Controller is running.
+
+        If the Adaptive controller is on, the control command computed previously is sent as a reference signal to the AC,
+        otherwise it is published as the standard car_cmd .
+        '''
+        ac_on = setupParameter("~ac_on",True)
+        if ac_on:
+            self.pub_ac_rif.publish(car_control_msg)
+        else:
+            self.publishCmd(car_control_msg)
+
+
+        # Get time
+        self.last_ms = currentMillis
 
 
 if __name__ == "__main__":
