@@ -7,7 +7,35 @@ from duckietown_msgs.msg import Twist2DStamped, LanePose, WheelsCmdStamped, Bool
 import time
 import numpy as np
 
+# from duckietown import DTROS
+# class lane_controller(DTROS):
+
 class lane_controller(object):
+    """Lane Controller
+
+    The 'lane_controller' node implements te standard PI controller for the Duckeibot.
+
+    This node maps the current lane pose to a proper car command that allows the robot to
+    stay inside the lane.
+    It reads the FSM state to switch between different modes.
+
+    Subscriber:
+        ~lane_pose(:obj:'LanePose'): current pose in the lane
+        ~obstacle_avoidance_pose(:obj:'LanePose'): pose of any detected obstacle in the lane
+        ~obstacle_detected(:obj:'BoolStamped'): bool that states if an obstacle is detected or not
+        ~intersection_navigation_pose(:obj:'LanePose'):
+        ~wheels_cmd_executed(:obj:'WheelsCmdStamped'): feedback of the true wheel speeds executed
+        ~actuator_limits(:obj:'Twist2DStamped'):
+        ~switch(:obj:'BoolStamped'):
+        ~stop_line_reading(:obj:'StopLineReading'):
+        ~fsm_mode(:obj:'FSMState'):
+
+    Publisher:
+        ~car_cmd(:obj:'Twist2DStamped'): car command computed that is read by the kinematics node
+            which remaps it to a proper wheel command
+        ~actuator_limits_received(:obj:'BoolStamped'): bool that states if the actuator limits are reached
+        ~radius_limit(:obj:'BoolStamped'): bool that states if the turn radius limit is reached
+        """
 
     def __init__(self):
         self.node_name = rospy.get_name()
@@ -26,10 +54,10 @@ class lane_controller(object):
 
         # Publication
         self.pub_car_cmd = rospy.Publisher("~car_cmd", Twist2DStamped, queue_size=1)
-        
+
         # TODO-TAL this is just to acknowledge receiving a msg... We should remove it... (or replace this and the corresponding subscriber with a service)
         self.pub_actuator_limits_received = rospy.Publisher("~actuator_limits_received", BoolStamped, queue_size=1)
-        
+
         self.pub_radius_limit = rospy.Publisher("~radius_limit", BoolStamped, queue_size=1)
 
 
